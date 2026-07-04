@@ -20,9 +20,11 @@ require "utils.Debug"
 
 -- Mod load order matters:
 -- upgrades.lua exposes helpers consumed by offline_progress.lua.
+-- quality_of_life.lua uses optional upgrade helpers and should run after core progression is available.
 -- world_modifiers.lua and computer_dig_aggressive.lua can run after core systems are available.
 require "upgrades"
 require "offline_progress"
+require "quality_of_life"
 require "world_modifiers"
 require "computer_dig_aggressive"
 require "auto_camera"
