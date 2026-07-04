@@ -24,7 +24,6 @@ require "utils.Debug"
 -- world_modifiers.lua and computer_dig_aggressive.lua can run after core systems are available.
 require "upgrades"
 require "offline_progress"
-require "quality_of_life"
 require "world_modifiers"
 require "computer_dig_aggressive"
 require "auto_camera"
