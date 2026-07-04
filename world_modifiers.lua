@@ -50,52 +50,6 @@ local function set_flag(obj, flag, val)
     Game._wm_applied[idx][flag] = val
 end
 
--- 1. Gigantism
-add_modifier({
-    id = 1,
-    name = "Gigantism",
-    description = "All creatures are giant (%vx size) and have +50% health.",
-    min = 1.3,
-    max = 2.0,
-    is_float = true,
-    unit = "",
-    update = function(v)
-        adjust_all_creatures(function(c)
-            if c.sprite_size < 300 * v then
-                c.sprite_size = math.floor(300 * v)
-            end
-            if not has_flag(c, "gigantism_applied") then
-                c.max_health = math.floor(c.max_health * 1.50)
-                c.health = c.max_health
-                set_flag(c, "gigantism_applied", true)
-            end
-        end)
-    end
-})
-
--- 2. Miniature
-add_modifier({
-    id = 2,
-    name = "Miniaturization",
-    description = "All creatures are miniature (%vx size) and have -40% health.",
-    min = 0.4,
-    max = 0.8,
-    is_float = true,
-    unit = "",
-    update = function(v)
-        adjust_all_creatures(function(c)
-            if c.sprite_size > 300 * v then
-                c.sprite_size = math.floor(300 * v)
-            end
-            if not has_flag(c, "mini_applied") then
-                c.max_health = math.max(10, math.floor(c.max_health * 0.60))
-                if c.health > c.max_health then c.health = c.max_health end
-                set_flag(c, "mini_applied", true)
-            end
-        end)
-    end
-})
-
 -- 3. Turbo Speed
 add_modifier({
     id = 3,
@@ -572,26 +526,6 @@ add_modifier({
     end
 })
 
--- 33. Giant Imps
-add_modifier({
-    id = 33,
-    name = "Giant Imps",
-    description = "Imps are huge (+100% size) and move twice as fast.",
-    update = function(v)
-        adjust_all_creatures(function(c)
-            if c.model == "IMP" then
-                if c.sprite_size < 600 then
-                    c.sprite_size = 600
-                end
-                if not has_flag(c, "imp_speed_applied") then
-                    c.max_speed = c.max_speed * 2
-                    set_flag(c, "imp_speed_applied", true)
-                end
-            end
-        end)
-    end
-})
-
 -- 34. Pacifist Slaps
 add_modifier({
     id = 34,
@@ -757,69 +691,7 @@ add_modifier({
     end
 })
 
--- Dynamically build modifiers 46 to 103 for each creature model to hit 100+ pool.
-local creature_models = {
-    "IMP", "FLY", "BUG", "SPIDER", "SPIDERLING", "TROLL", "DEMONSPAWN", 
-    "HELL_HOUND", "DARK_MISTRESS", "BILE_DEMON", "SORCEROR", "DRAGON", 
-    "VAMPIRE", "SKELETON", "GHOST", "TENTACLE", "WITCH", "FAIRY", 
-    "WIZARD", "MONK", "ARCHER", "BARBARIAN", "GIANT", "THIEF", 
-    "SAMURAI", "KNIGHT", "AVATAR", "DRUID", "TIME_MAGE"
-}
-
-for i, model in ipairs(creature_models) do
-    local buff_id = 45 + (i * 2 - 1)
-    local debuff_id = 45 + (i * 2)
-    
-    -- Buff: Titan [Creature]
-    add_modifier({
-        id = buff_id,
-        name = "Titan " .. model .. "s",
-        description = "All " .. model .. "s are giant (+%vx size) and have +75% max health.",
-        min = 1.2,
-        max = 1.6,
-        is_float = true,
-        unit = "",
-        update = function(v)
-            adjust_all_creatures(function(c)
-                if c.model == model then
-                    if c.sprite_size < 300 * v then
-                        c.sprite_size = math.floor(300 * v)
-                    end
-                    if not has_flag(c, "titan_applied") then
-                        c.max_health = math.floor(c.max_health * 1.75)
-                        c.health = c.max_health
-                        set_flag(c, "titan_applied", true)
-                    end
-                end
-            end)
-        end
-    })
-
-    -- Debuff: Miniature [Creature]
-    add_modifier({
-        id = debuff_id,
-        name = "Miniature " .. model .. "s",
-        description = "All " .. model .. "s are tiny (%vx size) and have -45% health.",
-        min = 0.5,
-        max = 0.8,
-        is_float = true,
-        unit = "",
-        update = function(v)
-            adjust_all_creatures(function(c)
-                if c.model == model then
-                    if c.sprite_size > 300 * v then
-                        c.sprite_size = math.floor(300 * v)
-                    end
-                    if not has_flag(c, "mini_applied") then
-                        c.max_health = math.max(10, math.floor(c.max_health * 0.55))
-                        if c.health > c.max_health then c.health = c.max_health end
-                        set_flag(c, "mini_applied", true)
-                    end
-                end
-            end)
-        end
-    })
-end
+local creature_models = {"IMP", "FLY", "BUG", "SPIDER", "SPIDERLING", "TROLL", "DEMONSPAWN", "HELL_HOUND", "DARK_MISTRESS", "BILE_DEMON", "SORCEROR", "DRAGON", "VAMPIRE", "SKELETON", "GHOST", "TENTACLE", "WITCH", "FAIRY", "WIZARD", "MONK", "ARCHER", "BARBARIAN", "GIANT", "THIEF", "SAMURAI", "KNIGHT", "AVATAR", "DRUID", "TIME_MAGE"}
 
 -- Dynamically build modifiers 104 to 161: Hyper-speed and Sluggish per creature model
 for i, model in ipairs(creature_models) do
@@ -1161,53 +1033,6 @@ for i, model in ipairs(creature_models) do
     })
 end
 
--- Dynamically build modifiers 511 to 568: Enlarged and Shrunk per creature model
-for i, model in ipairs(creature_models) do
-    local buff_id = 510 + (i * 2 - 1)
-    local debuff_id = 510 + (i * 2)
-
-    -- Buff: Enlarged [Creature]
-    add_modifier({
-        id = buff_id,
-        name = "Enlarged " .. model .. "s",
-        description = "All " .. model .. "s are enlarged (+%v% size).",
-        min = 30,
-        max = 100,
-        is_float = false,
-        unit = "",
-        update = function(v)
-            adjust_all_creatures(function(c)
-                if c.model == model then
-                    if not has_flag(c, "enlarged_applied") then
-                        c.sprite_size = math.floor(c.sprite_size * (1 + v / 100))
-                        set_flag(c, "enlarged_applied", true)
-                    end
-                end
-            end)
-        end
-    })
-
-    -- Debuff: Shrunk [Creature]
-    add_modifier({
-        id = debuff_id,
-        name = "Shrunk " .. model .. "s",
-        description = "All " .. model .. "s are shrunk (-%v% size).",
-        min = 30,
-        max = 60,
-        is_float = false,
-        unit = "",
-        update = function(v)
-            adjust_all_creatures(function(c)
-                if c.model == model then
-                    if not has_flag(c, "shrunk_applied") then
-                        c.sprite_size = math.max(50, math.floor(c.sprite_size * (1 - v / 100)))
-                        set_flag(c, "shrunk_applied", true)
-                    end
-                end
-            end)
-        end
-    })
-end
 
 -- Initialize system on level load
 function WorldModifiers_Init()

@@ -36,8 +36,8 @@ AutoCamera.anti_pingpong_distance_sq = 896 * 896
 AutoCamera.active_profile = "balanced"
 AutoCamera.max_map_scan_slabs = 255
 AutoCamera.sweep_pad_stl = 8          -- Subtile padding when sweeping across the map during quiet periods
-AutoCamera.sweep_speed_turns = 180    -- Turns it takes to complete one full sweep pass
-AutoCamera.breach_emergency_hp = 0.45 -- Door HP ratio threshold for breach (idea 47) — 30% = heavy damage
+AutoCamera.sweep_speed_turns = 360    -- Turns it takes to complete one full sweep pass
+AutoCamera.breach_emergency_hp = 0.30 -- Door HP ratio threshold for breach (idea 47) — 30% = heavy damage
 AutoCamera.bankruptcy_threshold = 2500 -- Gold amount below which bankruptcy warning triggers
 AutoCamera.prison_overcrowd_threshold = 6 -- Prisoner count threshold for prison warning
 AutoCamera.gold_milestone_interval = 1000 -- Gold mined between milestone interrupts
@@ -729,9 +729,12 @@ local function auto_camera_collect_targets()
 
         -- HEART HEALTH MONITORING
         if player.heart and player.heart.health and player.heart.health > 0 then
-            local heart_hp = player.heart.health or 1000
-            if heart_hp < 200 then auto_camera_add_target(targets, seen, player.heart, player.heart.pos, 500 + math.floor((200 - heart_hp) * 2) + ai_boost, "heart_panic")
-            elseif heart_hp < 950 then auto_camera_add_target(targets, seen, player.heart, player.heart.pos, 150 + math.floor((1000 - heart_hp) / 8) + ai_boost + 40, "heart_danger") end
+            local heart_hp = player.heart.health
+            local heart_max = player.heart.max_health or 1000
+            if heart_max <= 0 then heart_max = 1000 end
+            local ratio = heart_hp / heart_max
+            if ratio < 0.20 then auto_camera_add_target(targets, seen, player.heart, player.heart.pos, 500 + math.floor((0.20 - ratio) * 2000) + ai_boost, "heart_panic")
+            elseif ratio < 0.60 then auto_camera_add_target(targets, seen, player.heart, player.heart.pos, 150 + math.floor((0.60 - ratio) * 300) + ai_boost + 40, "heart_danger") end
         end
 
         -- CREATURE ITERATION: evaluate every creature for potential targets
@@ -1088,6 +1091,7 @@ function AutoCamera.Tick()
     end
     AutoCamera.player = AutoCamera.player or PLAYER0
     local player = AutoCamera.player
+    if not player then return end
     if not auto_camera_can_move_player(player) and not state.eyes_mode then return end
 
     local current_turn = player.GAME_TURN or 0
@@ -1565,6 +1569,7 @@ function AutoCameraTick()
 end
 function AutoCameraOnChat(eventData) pcall(AutoCamera.OnChat, eventData) end
 function AutoCameraOnDeath(eventData)
+    if not PLAYER0 then return end
     local u = eventData and eventData.unit
     if safe_is_valid(u) and u.owner == PLAYER0 and (u.level or 1) >= 8 then
         if u.model == "IMP" and auto_camera_has_non_imp(PLAYER0) then return end
@@ -1577,6 +1582,7 @@ function AutoCameraOnDeath(eventData)
 end
 
 function AutoCameraOnLevelUp(eventData)
+    if not PLAYER0 then return end
     local c = eventData and eventData.creature
     if safe_is_valid(c) and (c.level or 1) >= 8 and c.owner == PLAYER0 then
         if c.model == "IMP" and auto_camera_has_non_imp(PLAYER0) then return end
@@ -1591,6 +1597,7 @@ end
 
 -- ROOM CAPTURE INTERRUPT: focus the camera when a room changes ownership
 function AutoCameraOnRoomTaken(eventData)
+    if not PLAYER0 then return end
     local room = eventData and (eventData.room or eventData.Room)
     local p = eventData and (eventData.player or eventData.Player or eventData.owner or eventData.Owner)
     local old_p = eventData and (eventData.old_player or eventData.old_owner)
@@ -1608,6 +1615,7 @@ end
 
 -- SPECIAL FOUND INTERRUPT: focus the camera when a special box is used
 function AutoCameraOnSpecialUsed(eventData)
+    if not PLAYER0 then return end
     local loc = eventData and (eventData.pos or eventData.location or eventData.Position)
     local p = eventData and (eventData.player or eventData.Player)
     if loc and p == PLAYER0 then
@@ -1619,6 +1627,7 @@ end
 -- spell_focus (idea 22): high-priority interrupt (450). spell_cast_focus (idea 55): lower priority (200).
 -- Both use the same trigger; check each idea's toggle independently.
 function AutoCameraOnPowerCast(eventData)
+    if not PLAYER0 then return end
     local loc = eventData and (eventData.pos or eventData.location or eventData.Position)
     if not loc or eventData.player ~= PLAYER0 then return end
     local state = auto_camera_state()
@@ -1644,6 +1653,7 @@ end
 
 -- EXCAVATION AND CONSTRUCTION FOCUS (ideas 23 & 31): focus on wall digging and room building
 function AutoCameraOnSlabChanged(eventData)
+    if not PLAYER0 then return end
     local state = auto_camera_state()
     local current_turn = PLAYER0.GAME_TURN or 0
     local slab = eventData and (eventData.slab or eventData.Slab)
@@ -1687,6 +1697,7 @@ end
 -- MAJOR DAMAGE FOCUS (idea 30) and IMPENDING BREACH / DOOR_BREACH (idea 47): focus on units or doors taking huge hits
 -- DOOR_BREACH label is used for all heavy-damage-on-door events (both here and in AutoCameraOnObjectDestroyed)
 function AutoCameraOnApplyDamage(eventData)
+    if not PLAYER0 then return end
     local u = eventData and eventData.thing
     local dmg = eventData and eventData.damage or 0
     if not safe_is_valid(u) or dmg <= 0 then return end
@@ -1715,6 +1726,7 @@ end
 
 -- TRAP PLACED INTERRUPT (idea 25): focus on new trap construction
 function AutoCameraOnTrapPlaced(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.trap_focus then return end
     local trap = eventData and (eventData.trap or eventData.Trap)
     if trap and trap.owner == PLAYER0 then
@@ -1724,6 +1736,7 @@ end
 
 -- TRAP TRIGGER / CARNAGE FOCUS (idea 49): focus on traps detonating or rolling
 function AutoCameraOnTrapTriggered(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.trap_trigger then return end
     local trap = eventData and (eventData.trap or eventData.Trap or eventData.thing or eventData.object)
     if safe_is_valid(trap) and trap.owner == PLAYER0 then
@@ -1737,6 +1750,7 @@ end
 
 -- EXPANSION FOCUS (idea 24): focus on territory claiming
 function AutoCameraOnSlabOwnerChanged(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.claim_focus then return end
     local slab = eventData and (eventData.slab or eventData.Slab)
     if slab and slab.owner == PLAYER0 and slab.slb_x and slab.slb_y then
@@ -1751,6 +1765,7 @@ end
 
 -- REBIRTH FOCUS (idea 27): focus on undead rising
 function AutoCameraOnRebirth(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.rebirth_focus then return end
     local u = eventData and (eventData.unit or eventData.Unit)
     if safe_is_valid(u) and u.owner == PLAYER0 then
@@ -1760,6 +1775,7 @@ end
 
 -- DUNGEON DESTROYED FOCUS (idea 28): focus on defeated keepers
 function AutoCameraOnDungeonDestroyed(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.dungeon_destroyed_focus then return end
     local p = eventData and (eventData.player or eventData.Player)
     if p and p == PLAYER0 and p.heart and p.heart.pos then
@@ -1770,6 +1786,7 @@ end
 -- DOOR DESTROYED FOCUS (idea 29): focus on broken doors as strategic breaches
 -- Uses label "door_breach" to consolidate breach alerts under one label for heatmap/scoring
 function AutoCameraOnObjectDestroyed(eventData)
+    if not PLAYER0 then return end
     if not AutoCamera.ideas.door_destroyed_focus then return end
     local obj = eventData and (eventData.unit or eventData.Unit or eventData.object)
     if safe_is_valid(obj) and obj.model and string.find(tostring(obj.model), "DOOR") then

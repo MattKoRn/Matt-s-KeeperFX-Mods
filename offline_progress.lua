@@ -1,5 +1,3 @@
-
--- offline_progress.lua
 -- offline_progress.lua
 -- Handles offline Upgrade Gold income and standard gold checkpointing across maps.
 -- Optimized to prevent lag by reducing map-wide iterations.
@@ -19,7 +17,7 @@ OfflineProgress.offline_award_pending = false
 
 -- State variables for initialization
 OfflineProgress.target_upgrade_gold = nil
-OfflineProgress.last_saved_gold = -1 
+OfflineProgress.last_saved_gold = -1
 OfflineProgress.last_mirrored_gold = -1
 OfflineProgress.last_saved_timestamp = 0
 OfflineProgress.last_saved_rate = 1.0
@@ -68,9 +66,7 @@ function OfflineProgress.on_game_tick(eventData)
 
     local current_turn = PLAYER0.GAME_TURN or 0
     if OfflineProgress.should_reinitialize(current_turn) and OfflineProgress.last_reinit_turn ~= current_turn then
-        Game.offline_progress_last_session_id = OfflineProgress.session_id
-        OfflineProgress.last_reinit_turn = current_turn
-        OfflineProgress.init()
+        OfflineProgress.rebind_after_game_loaded()
     end
 
     OfflineProgress.last_seen_turn = current_turn
@@ -83,26 +79,68 @@ function OfflineProgress_OnGameTick(eventData)
 end
 
 function OfflineProgress.format_number(value)
-    local amount = tonumber(value) or 0
-    local negative = amount < 0
-    amount = math.abs(amount)
-    local suffix_index = 1
-    while amount >= 1000 and suffix_index < #OfflineProgress.number_suffixes do
-        amount = amount / 1000
-        suffix_index = suffix_index + 1
+    local n = tonumber(value) or 0
+    if n ~= n then return "0" end
+    local negative = n < 0
+    n = math.abs(n)
+    
+    if n >= (10 ^ 300) then return negative and "-MAX" or "MAX" end
+    n = math.floor(math.max(0, n))
+    if n < 1000 then return (negative and "-" or "") .. tostring(n) end
+
+    local idx = math.floor(math.log(n) / math.log(1000))
+    local divisor = 1000 ^ idx
+    local val = n / divisor
+
+    local decimals
+    if idx <= 1 then decimals = 2
+    elseif idx <= 3 then decimals = 1
+    else decimals = 0 end
+
+    local precision_unit = 1 / (10 ^ decimals)
+    val = math.floor(val * (10 ^ decimals) + 0.5) / (10 ^ decimals)
+
+    if val >= (1000 - (precision_unit * 0.5)) and idx + 1 < #OfflineProgress.number_suffixes then
+        idx = idx + 1
+        divisor = 1000 ^ idx
+        val = n / divisor
+        if idx <= 1 then decimals = 2
+        elseif idx <= 3 then decimals = 1
+        else decimals = 0 end
+        val = math.floor(val * (10 ^ decimals) + 0.5) / (10 ^ decimals)
     end
+
     local formatted
-    if suffix_index == 1 then
-        formatted = tostring(math.floor(amount))
+    if idx < #OfflineProgress.number_suffixes then
+        if decimals > 0 then
+            local str = string.format("%." .. decimals .. "f", val)
+            str = string.gsub(str, "0+$", "")
+            str = string.gsub(str, "%.$", "")
+            formatted = str .. OfflineProgress.number_suffixes[idx + 1]
+        else
+            formatted = math.floor(val + 0.5) .. OfflineProgress.number_suffixes[idx + 1]
+        end
     else
-        local str = string.format("%.2f", amount)
-        str = string.gsub(str, "0+$", "")
-        str = string.gsub(str, "%.$", "")
-        formatted = str .. OfflineProgress.number_suffixes[suffix_index]
+        local extra = idx - (#OfflineProgress.number_suffixes - 1)
+        local num = extra + 26
+        local chars = {}
+        while num > 0 do
+            num = num - 1
+            table.insert(chars, 1, string.char(65 + (num % 26)))
+            num = math.floor(num / 26)
+        end
+        local suffix = table.concat(chars)
+        if decimals > 0 then
+            local str = string.format("%." .. decimals .. "f", val)
+            str = string.gsub(str, "0+$", "")
+            str = string.gsub(str, "%.$", "")
+            formatted = str .. suffix
+        else
+            formatted = math.floor(val + 0.5) .. suffix
+        end
     end
-    if negative then
-        return "-" .. formatted
-    end
+
+    if negative then return "-" .. formatted end
     return formatted
 end
 
@@ -151,10 +189,23 @@ end
 
 function OfflineProgress.save_data(gold, timestamp, rate)
     OfflineProgress.ensure_directory(OfflineProgress.data_path)
-    local f = io.open(OfflineProgress.data_path, "w")
+    local tmp_path = tostring(OfflineProgress.data_path) .. ".tmp"
+    local f = io.open(tmp_path, "w")
     if f then
         f:write(tostring(gold) .. "," .. tostring(timestamp) .. "," .. tostring(rate or OfflineProgress.base_rate))
         f:close()
+        local renamed = false
+        if os and os.rename then
+            os.remove(OfflineProgress.data_path)
+            renamed = os.rename(tmp_path, OfflineProgress.data_path)
+        end
+        if not renamed then
+            local direct = io.open(OfflineProgress.data_path, "w")
+            if direct then
+                direct:write(tostring(gold) .. "," .. tostring(timestamp) .. "," .. tostring(rate or OfflineProgress.base_rate))
+                direct:close()
+            end
+        end
     else
         OfflineProgress.log_message("Failed to save offline progress to " .. tostring(OfflineProgress.data_path))
     end
@@ -207,14 +258,15 @@ function OfflineProgress.calculate_current_rate()
                + (area * OfflineProgress.area_bonus)
                + (unique_rooms * 0.50)
                + ((avg_level - 1) * 0.40)
-               + math.min(research / 5000, 8.0)
-               + math.min(score / 3000, 6.0)
+               + math.max(0, math.min(research / 5000, 8.0))
+               + math.max(0, math.min(score / 3000, 6.0))
+               
+    if rate > 150.0 then rate = 150.0 end
                
     if Upgrades and Upgrades.offline_income_flat_bonus then
         rate = rate + Upgrades.offline_income_flat_bonus()
     end
 
-    if rate > 150.0 then rate = 150.0 end
     if Upgrades and Upgrades.offline_income_multiplier then
         rate = rate * Upgrades.offline_income_multiplier()
     end
@@ -239,21 +291,20 @@ function OfflineProgress.get_creature_training_cost(cr)
     end
     local model_key = tostring(cr.model or ""):upper():gsub("%s+", "_")
     local base_cost = BASE_TRAINING_COSTS[model_key] or 20
-    local reduction = 0
     if Upgrades and Upgrades.effective_owned_rank then
         local rank = Upgrades.effective_owned_rank(6) or 0
         local per_rank = 5
         local scaled_val = math.max(1, math.floor(100 - rank * per_rank + 0.5))
-        reduction = math.max(0, 100 - scaled_val)
+        return math.max(1, math.floor((base_cost * scaled_val) / 100))
     end
-    return math.max(1, base_cost - reduction)
+    return math.max(1, base_cost)
 end
 
 function OfflineProgress.simulate_training(time_diff)
     if not PLAYER0 or not GetCreaturesOfPlayer then return 0, 0, 0 end
     local max_level = 1
     if Upgrades and Upgrades.get_rank then
-        max_level = math.min(10, 1 + math.floor(Upgrades.get_rank(17) / 10))
+        max_level = math.min(10, 1 + math.floor(Upgrades.get_rank(24) / 5))
     end
     if max_level <= 1 then return 0, 0, 0 end
 
@@ -270,9 +321,9 @@ function OfflineProgress.simulate_training(time_diff)
     local creatures = GetCreaturesOfPlayer(PLAYER0) or {}
     for _, cr in ipairs(creatures) do
         local cr_level = tonumber(cr.level) or 1
+        local available_ticks = ticks_offline
         if cr_level < max_level then
             local cost_per_tick = OfflineProgress.get_creature_training_cost(cr)
-            local available_ticks = ticks_offline
             while cr_level < max_level and available_ticks > 2500 * cr_level do
                 local required_ticks = 2500 * cr_level
                 local required_gold = math.floor(required_ticks * cost_per_tick / 20)
@@ -292,7 +343,8 @@ function OfflineProgress.simulate_training(time_diff)
             end
         end
         if cr_level >= 10 then
-            expeditions = expeditions + math.floor(time_diff / 28800) -- 8 hours instead of 12
+            local remaining_seconds = available_ticks / (20 * speed_mult)
+            expeditions = expeditions + math.floor(remaining_seconds / 43200) -- 12 hours
         end
     end
     
@@ -426,8 +478,8 @@ function OfflineProgress.apply_initial_gold()
             end
 
             if expeditions > 0 and Upgrades and Upgrades.add_upgrade_gold then
-                -- Expedition reward: 50000 Upgrade Gold per expedition!
-                local exp_reward = expeditions * 50000
+                -- Expedition reward: 5000 Upgrade Gold per expedition!
+                local exp_reward = expeditions * 5000
                 Upgrades.add_upgrade_gold(exp_reward)
                 upgrade_gold = upgrade_gold + exp_reward
                 if Upgrades.save then pcall(Upgrades.save) end
@@ -482,9 +534,8 @@ function OfflineProgress.mirror_gold_gains()
 
     if current_gold > OfflineProgress.last_mirrored_gold then
         Upgrades.add_upgrade_gold(current_gold - OfflineProgress.last_mirrored_gold)
-        OfflineProgress.last_mirrored_gold = current_gold
-        -- Removed forced save; Upgrades._dirty is set internally and saved periodically by Upgrades_SilentSave
     end
+    OfflineProgress.last_mirrored_gold = current_gold
 end
 
 function OfflineProgress.periodic_save()
@@ -512,7 +563,7 @@ function OfflineProgress.rebind_after_game_loaded()
     OfflineProgress.session_watch_registered = false
     OfflineProgress.initial_gold_applied = false
     OfflineProgress.offline_award_pending = false
-    OfflineProgress.last_reinit_turn = -1
+    OfflineProgress.last_reinit_turn = (PLAYER0 and PLAYER0.GAME_TURN) or -1
     OfflineProgress.last_seen_turn = (PLAYER0 and PLAYER0.GAME_TURN) or -1
     OfflineProgress.last_mirrored_gold = (PLAYER0 and PLAYER0.MONEY) or -1
 

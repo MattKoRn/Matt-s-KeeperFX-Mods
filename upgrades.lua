@@ -26,7 +26,7 @@ Upgrades.version = "v17-training-contract-polish"
 Upgrades.buymax_auto_enabled = true
 Upgrades.buymax_auto_min_roi = 0 -- Auto Buy should continue as long as there's a benefit
 Upgrades.buymax_auto_last_turn = Upgrades.buymax_auto_last_turn or 0
-Upgrades.buymax_auto_interval = 1200 -- 1 minute at 20 ticks/sec
+Upgrades.buymax_auto_interval = 6000 -- 5 minutes at 20 ticks/sec
 Upgrades.buymax_auto_announced_turn = Upgrades.buymax_auto_announced_turn or -1
 Upgrades.buymax_auto_startup_skip_announcement = (Upgrades.buymax_auto_startup_skip_announcement or 2)
 Upgrades.buymax_auto_block_until_turn = math.huge
@@ -235,14 +235,13 @@ local function format_gold(n)
     local function alpha_suffix(num)
         -- Spreadsheet-style suffixes: AA..ZZ, AAA..ZZZ, etc.
         -- This avoids wrapping back to AA at extreme ranks.
-        num = math.max(1, math.floor(tonumber(num) or 1))
+        num = math.max(1, math.floor(tonumber(num) or 1)) + 26
         local chars = {}
         while num > 0 do
             num = num - 1
             table.insert(chars, 1, string.char(65 + (num % 26)))
             num = math.floor(num / 26)
         end
-        if #chars == 1 then table.insert(chars, 1, "A") end
         return table.concat(chars)
     end
     if decimals > 0 then
@@ -1340,7 +1339,7 @@ local AI_TRAITS = {
 local HERO_TRAITS = {
     { name = "Paladin",    offense=1.20, defense=1.50, economy=0.70, creatures=1.20, utility=0.90, desc="Righteous protector with balanced combat prowess." },
     { name = "Shadow",     offense=1.50, defense=0.70, economy=1.30, creatures=0.80, utility=1.20, desc="Strikes from darkness with gold-fueled subterfuge." },
-    { name = "Inquisitor",  offense=1.75, defense=1.10, economy=0.50, creatures=1.20, utility=1.20, desc="Purges heretics; deals bonus damage to high-level player creatures." },
+    { name = "Inquisitor", offense=1.75, defense=1.10, economy=0.50, creatures=1.20, utility=1.20, desc="Purges heretics; deals bonus damage to high-level player creatures." },
     { name = "Archon",     offense=1.30, defense=1.30, economy=0.60, creatures=1.40, utility=1.40, desc="Empowers heroes with divine synergy; all heroes gain +1 level when spawning." },
     { name = "Assassin",   offense=1.80, defense=0.50, economy=1.00, creatures=0.90, utility=1.50, desc="Highly lethal but fragile; prioritizes taking down the Dungeon Heart quickly." },
 }
@@ -4549,6 +4548,9 @@ function Upgrades_OnCreatureDeath(eventData)
         end
         if Upgrades._intervention_stacks then
             Upgrades._intervention_stacks[idx] = nil
+        end
+        if Game and Game._wm_applied then
+            Game._wm_applied[idx] = nil
         end
     end
     if not idx or not Upgrades._recent_damage_sources then return end
