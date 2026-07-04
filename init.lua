@@ -17,8 +17,12 @@ require "managers.ThingManager"
 require "managers.RoomManager"
 require "gamelogic.ShotFunctions"
 require "utils.Debug"
-require "auto_camera"
-require "offline_progress"
+
+-- Mod load order matters:
+-- upgrades.lua exposes helpers consumed by offline_progress.lua.
+-- world_modifiers.lua and computer_dig_aggressive.lua can run after core systems are available.
 require "upgrades"
+require "offline_progress"
 require "world_modifiers"
 require "computer_dig_aggressive"
+require "auto_camera"
