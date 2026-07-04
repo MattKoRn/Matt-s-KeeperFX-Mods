@@ -1,0 +1,9 @@
+# normalize text
+*.lua text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# runtime data
+*.dat binary
+*.sav binary
+*.save binary
