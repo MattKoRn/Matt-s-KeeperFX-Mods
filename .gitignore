@@ -1,0 +1,24 @@
+# KeeperFX generated runtime data
+*.dat
+*.log
+
+# Local save/state files
+*.sav
+*.save
+*.bak
+*.tmp
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Packaged archives/build outputs
+*.zip
+*.7z
+*.rar
+build/
+dist/
