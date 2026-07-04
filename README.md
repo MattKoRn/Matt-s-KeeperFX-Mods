@@ -1,12 +1,16 @@
 # Matt's KeeperFX Mods
 
-Lua mod systems for KeeperFX focused on persistent progression, offline rewards, and randomized map modifiers.
+Lua mod systems for KeeperFX focused on persistent progression, offline rewards, automated camera movement, aggressive computer digging, and randomized map modifiers.
 
 ## Files
 
+- `init.lua` - entry point that loads core modules and mods in a dependency-safe order.
 - `upgrades.lua` - persistent upgrade shop and Upgrade Gold progression.
 - `offline_progress.lua` - offline rewards, checkpointing, save/load rebinding, and training simulation.
 - `world_modifiers.lua` - randomized world modifiers and active map effects.
+- `auto_camera.lua` - automated cinematic camera targeting, interrupts, and chat controls.
+- `computer_dig_aggressive.lua` - PLAYER0 auto-dig logic for hero/rival objectives.
+- `keepcompp.cfg` - KeeperFX computer player configuration.
 
 ## Player commands
 
@@ -16,6 +20,7 @@ Lua mod systems for KeeperFX focused on persistent progression, offline rewards,
 - `/upgrades buymax` - buy efficient affordable upgrades.
 - `/upgrades status` - show owned upgrade summary.
 - `/m`, `/modifier`, or `/modifiers` - show active world modifiers.
+- `/autocam` - control the automated camera system when `auto_camera.lua` is loaded.
 
 ## Runtime files
 
